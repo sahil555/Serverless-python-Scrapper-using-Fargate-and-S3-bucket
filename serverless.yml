@@ -1,0 +1,196 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: my-sls-scraper
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+# frameworkVersion: "=X.X.X"
+
+provider:
+  name: aws
+  runtime: python3.8
+  profile: sahilkk
+  logRetentionInDays: 1
+
+
+  environment:
+      HTTP_CACHE_BUCKET_NAME: !Ref HttpCacheBucket
+      FEED_BUCKET_NAME: !Ref ScraperFeedBucket
+      ECS_CLUSTER: !GetAtt FargateECSCluster.Arn
+      ECS_TASK_ARN: !Ref FargateECSTaskDefinition
+      ECS_SUBNET: !Ref FargateSubnet
+      ECS_SEC_GROUP: !Ref FargateSG
+      CONTAINER_NAME: "scraper_container"
+
+
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+        - "s3:PutObject"
+        - "s3:ListBucket"
+      
+      Resource: 
+        - !Sub
+           - "arn:aws:s3:::#{BucketName}/*"
+           - BucketName: !Ref HttpCacheBucket
+        - !Sub
+           - "arn:aws:s3:::#{BucketName}"
+           - BucketName: !Ref HttpCacheBucket
+    
+    - Effect: Allow
+      Action:
+        - ecs:RunTask
+
+      Resource:
+        - !Ref FargateECSTaskDefinition
+
+    - Effect: Allow
+      Action:
+        - iam:PassRole
+
+      Resource: 
+        - !GetAtt FargateExecutionRole.Arn
+
+    - Effect: Allow
+      Action:
+        - iam:PassRole
+      Resource: 
+        - !GetAtt FargateTaskRole.Arn
+
+
+
+functions:
+  pollSpidersScrape:
+      handler: handler.run_crawlers
+      events:
+        - schedule:
+             rate: rate(2 hours)
+             enabled: true
+             description: Poll spiders every 2 hours
+
+      
+
+
+
+# We include files by whitelisting to reduce the deployment time.
+# Just remember to add any files you create!
+package:
+  include:
+    - handler.py
+    - launcher.py
+    - launch_fargate.py
+    - my_sls_scraper/**
+    - scrapy.cfg
+  exclude:
+    - "./**"
+
+
+resources:
+  - AWSTemplateFormatVersion: "2010-09-09"
+    Transform: "AWS::Serverless-2016-10-31"
+  - ${file(./s3-template.yml)}
+  - ${file(./fargate-template.yml)}
+
+
+
+
+plugins:
+  - serverless-python-requirements
+  - serverless-cloudformation-sub-variables
+
+custom:
+  pythonRequirements:
+    slim: true # Omits tests, __pycache__, *.pyc etc from dependencies
+    fileName: requirements.txt
+
+# you can overwrite defaults here
+#  stage: dev
+#  region: us-east-1
+
+# you can add statements to the Lambda function's IAM Role here
+#  iamRoleStatements:
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:ListBucket"
+#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:PutObject"
+#      Resource:
+#        Fn::Join:
+#          - ""
+#          - - "arn:aws:s3:::"
+#            - "Ref" : "ServerlessDeploymentBucket"
+#            - "/*"
+
+# you can define service wide environment variables here
+#  environment:
+#    variable1: value1
+
+# you can add packaging information h
+
+
+
+#    The following are a few example events you can configure
+#    NOTE: Please make sure to change your handler code to work with those events
+#    Check the event documentation for details
+#    events:
+#      - http:
+#          path: users/create
+#          method: get
+#      - websocket: $connect
+#      - s3: ${env:BUCKET}
+#      - schedule: rate(10 minutes)
+#      - sns: greeter-topic
+#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
+#      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
+#      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
+#      - iot:
+#          sql: "SELECT * FROM 'some_topic'"
+#      - cloudwatchEvent:
+#          event:
+#            source:
+#              - "aws.ec2"
+#            detail-type:
+#              - "EC2 Instance State-change Notification"
+#            detail:
+#              state:
+#                - pending
+#      - cloudwatchLog: '/aws/lambda/hello'
+#      - cognitoUserPool:
+#          pool: MyUserPool
+#          trigger: PreSignUp
+#      - alb:
+#          listenerArn: arn:aws:elasticloadbalancing:us-east-1:XXXXXX:listener/app/my-load-balancer/50dc6c495c0c9188/
+#          priority: 1
+#          conditions:
+#            host: example.com
+#            path: /hello
+
+#    Define function environment variables here
+#    environment:
+#      variable2: value2
+
+# you can add CloudFormation resource templates here
+#resources:
+#  Resources:
+#    NewResource:
+#      Type: AWS::S3::Bucket
+#      Properties:
+#        BucketName: my-new-bucket
+#  Outputs:
+#     NewOutput:
+#       Description: "Description for the output"
+#       Value: "Some output value"
+

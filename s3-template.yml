@@ -1,0 +1,8 @@
+Resources:
+  ScraperFeedBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: "Enabled"
+  HttpCacheBucket:
+    Type: AWS::S3::Bucket
